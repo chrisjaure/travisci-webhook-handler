@@ -1,0 +1,9 @@
+{
+    "extends": ["./node_modules/eslint-config-defaults/configurations/eslint.yaml"],
+    "env": {
+        "node": true
+    },
+    "rules": {
+        "semi": [2, "always"]
+    }
+}

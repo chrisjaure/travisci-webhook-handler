@@ -1,0 +1,30 @@
+{
+  "name": "travisci-webhook-handler",
+  "version": "1.0.0",
+  "description": "Web handler / middleware for processing Travis CI Webhooks",
+  "main": "handler.js",
+  "scripts": {
+    "test": "node test.js",
+    "start": "node index.js"
+  },
+  "keywords": [
+    "travis",
+    "travis-ci",
+    "webhook"
+  ],
+  "author": "Chris Jaure <chrisjaure@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chrisjaure/travisci-webhook-handler.git"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "body": "^5.1.0"
+  },
+  "devDependencies": {
+    "eslint": "^1.2.1",
+    "eslint-config-defaults": "^5.0.0",
+    "tape": "^4.2.0",
+    "through2": "^2.0.0"
+  }
+}
