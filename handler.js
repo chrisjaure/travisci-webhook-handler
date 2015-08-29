@@ -38,7 +38,7 @@ function create(options) {
             callback(err);
         }
 
-        var repoSlug = req.headers['travis_repo_slug'];
+        var repoSlug = req.headers['travis-repo-slug'];
         var sig = req.headers['authorization'];
 
         if (!sig) {

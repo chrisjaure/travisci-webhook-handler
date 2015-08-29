@@ -12,7 +12,7 @@ function mkReq(url) {
     req.url = url;
     req.headers = {
         'authorization': signRequest('bogus', 'bogus'),
-        'travis_repo_slug': 'bogus'
+        'travis-repo-slug': 'bogus'
     };
 
     return req;
