@@ -130,10 +130,11 @@ test('handler accepts form payload', function (t) {
     var res = mkRes();
     var json = { status: 0 };
 
-    t.plan(4);
+    t.plan(5);
 
     h.on('success', function(req) {
         t.deepEqual(req.payload, json, 'payload is correct');
+        t.equal(req.event, 'success', 'event is correct');
         t.deepEqual(res.$headers, { 'content-type': 'application/json' }, 'json header set');
         t.equal(res.$end, '{"ok":true}', 'got correct content');
         t.pass('success event emitted');

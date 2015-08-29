@@ -65,15 +65,16 @@ function create(options) {
             res.writeHead(200, { 'content-type': 'application/json' });
             res.end('{"ok":true}');
 
-            var emitData = {
-                payload: result,
-                host: req.headers['host'],
-                url: req.url
-            };
             var event = (result.status === 0) ? 'success' : 'failure';
             if (event === 'failure' && result.status_message === 'Pending') {
                 event = 'start';
             }
+            var emitData = {
+                payload: result,
+                host: req.headers['host'],
+                url: req.url,
+                event: event
+            };
 
             handler.emit('*', emitData);
             handler.emit(event, emitData);
