@@ -19,7 +19,8 @@
   },
   "license": "MIT",
   "dependencies": {
-    "body": "^5.1.0"
+    "body": "^5.1.0",
+    "node-rsa": "^0.4.2"
   },
   "devDependencies": {
     "eslint": "^1.2.1",
