@@ -1,6 +1,6 @@
 {
   "name": "travisci-webhook-handler",
-  "version": "1.0.2",
+  "version": "2.0.0",
   "description": "Web handler / middleware for processing Travis CI Webhooks",
   "main": "handler.js",
   "scripts": {
