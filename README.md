@@ -6,12 +6,30 @@ This library is a small handler for Node.js web servers that handles all the log
 
 Inspired by [github-webhook-handler](https://github.com/rvagg/github-webhook-handler).
 
+## Authentication
+The Travis CI webhook notifications are authenticated by public/private key-pair signing and verification.
+
+The handler only accepts authenticated requests.
+
+Please make sure you pass in Travis CI's public key, which can be found [here](https://api.travis-ci.org/config).
+
+```js
+fetch('https://api.travis-ci.org/config')
+  .then((res) => res.text())
+  .then(function(body) {
+    handler = createHandler({
+      path: '/webhook',
+      public_key: JSON.parse(body).config.notifications.webhook.public_key
+    })
+  })
+```
+
 ## Example
 
 ```js
 var http = require('http')
 var createHandler = require('travisci-webhook-handler')
-var handler = createHandler({ path: '/webhook', token: 'mytoken' })
+var handler = createHandler({ path: '/webhook', public_key: 'travisPublicKey' })
 
 http.createServer(function (req, res) {
   handler(req, res, function (err) {

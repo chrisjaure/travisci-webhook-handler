@@ -1,5 +1,5 @@
 var EventEmitter = require('events').EventEmitter;
-var crypto = require('crypto');
+var NodeRSA = require('node-rsa');
 var formBody = require('body/form');
 
 function bindEmitter(obj, emitter) {
@@ -7,10 +7,6 @@ function bindEmitter(obj, emitter) {
     methods.split(',').forEach(function (fn) {
         obj[fn] = emitter[fn].bind(emitter);
     });
-}
-
-function signRequest (repoSlug, userToken) {
-    return crypto.createHash('sha256').update(repoSlug + userToken).digest('hex');
 }
 
 function create(options) {
@@ -22,8 +18,8 @@ function create(options) {
         throw new TypeError('must provide a \'path\' option');
     }
 
-    if (typeof options.token !== 'string') {
-        throw new TypeError('must provide a \'token\' option');
+    if (typeof options.public_key !== 'string') {
+        throw new TypeError('must provide a \'public_key\' option');
     }
 
     var handler = function (req, res, callback) {
@@ -39,22 +35,26 @@ function create(options) {
         }
 
         var repoSlug = req.headers['travis-repo-slug'];
-        var sig = req.headers['authorization'];
+
+        var sig   = req.headers['signature']
 
         if (!sig) {
-            return hasError('No authorization found on request');
+            return hasError('No Signature found on request');
         }
         if (!repoSlug) {
             return hasError('No repo found on request');
-        }
-        if (sig !== signRequest(repoSlug, options.token)){
-            return hasError('Authentication does not match');
         }
 
         formBody(req, {}, function (err, data) {
             if (err) {
                 return hasError(err.message);
             }
+
+            var key = new NodeRSA(options.public_key, {signingScheme: 'sha1'});
+
+            if (!key.verify(JSON.parse(data.payload), sig, 'base64', 'base64'))
+                return hasError('Signed payload does not match signature')
+
             var result;
             try {
                 result = JSON.parse(data.payload);

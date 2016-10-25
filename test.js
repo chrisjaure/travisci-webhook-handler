@@ -1,21 +1,20 @@
 var test = require('tape');
-var crypto = require('crypto');
 var handler = require('./handler');
 var through2 = require('through2');
+var NodeRSA = require('node-rsa');
 
-function signRequest (repoSlug, userToken) {
-    return crypto.createHash('sha256').update(repoSlug + userToken).digest('hex');
-}
+var key = new NodeRSA({b: 1024}, {signingScheme: 'sha1'});
+var public_key = key.exportKey('public');
 
-function mkReq(url) {
-    var req = through2();
-    req.url = url;
-    req.headers = {
-        'authorization': signRequest('bogus', 'bogus'),
-        'travis-repo-slug': 'bogus'
-    };
-
-    return req;
+function mkReq (url) {
+  var req = through2()
+  req.url = url
+  req.headers = {
+      'signature'         : 'bogus'
+    , 'host'              : 'some-host'
+    , 'travis-repo-slug'  : 'bogus'
+  }
+  return req
 }
 
 function mkRes() {
@@ -36,12 +35,12 @@ test('handler without full options throws', function (t) {
     t.equal(typeof handler, 'function', 'handler exports a function');
     t.throws(handler, /must provide an options object/, 'throws if no options');
     t.throws(handler.bind(null, {}), /must provide a 'path' option/, 'throws if no path option');
-    t.throws(handler.bind(null, { path: '/' }), /must provide a 'token' option/, 'throws if no token option');
+    t.throws(handler.bind(null, { path: '/' }), /must provide a 'public_key' option/, 'throws if no public_key option');
     t.end();
 });
 
 test('handler acts like an event emitter', function (t) {
-    var h = handler({ path: '/some/url', token: 'bogus' });
+    var h = handler({ path: '/some/url', public_key: public_key });
 
     t.plan(5);
 
@@ -61,7 +60,7 @@ test('handler acts like an event emitter', function (t) {
 test('handler ignores invalid urls', function(t) {
     var options = {
         path: '/some/url',
-        token: 'bogus'
+        public_key: public_key
     };
     var h = handler(options);
 
@@ -82,26 +81,67 @@ test('handler ignores invalid urls', function(t) {
     });
 });
 
-test('handler rejects incorrect authentication', function (t) {
-    var options = {
-        path: '/some/url',
-        token: 'bogus'
-    };
-    var h = handler(options);
-    var req = mkReq('/some/url');
-    req.headers.authorization = 'bogus';
+test('handler accepts a signed payload that passes verification', function (t) {
+  t.plan(4)
 
-    t.plan(1);
+  var obj  = { some: 'travis', object: 'with', properties: true, status: 0 }
+    , json = JSON.stringify(obj)
+    , h    = handler({ path: '/', public_key: public_key })
+    , req  = mkReq('/')
+    , res  = mkRes()
 
-    h(req, mkRes(), function(err) {
-        t.equal(err.message, 'Authentication does not match', 'authentication error is passed');
-    });
-});
+  req.headers['signature'] = key.sign(obj, 'base64', 'base64')
+
+  h.on('success', function(req) {
+    t.deepEqual(req, { event: 'success', payload: obj, url: '/', host: 'some-host' })
+    t.equal(res.$statusCode, 200, 'correct status code')
+    t.deepEqual(res.$headers, { 'content-type': 'application/json' })
+    t.equal(res.$end, '{"ok":true}', 'got correct content')
+  })
+
+  h(req, res, function (err) {
+    t.error(err)
+    t.fail(true, 'should not get here!')
+  })
+
+  process.nextTick(function () {
+    req.end('payload=' + json);
+  })
+})
+
+test('handler rejects a signed payload that fails verification', function (t) {
+  t.plan(4)
+
+  var obj  = { some: 'travis', object: 'with', properties: true }
+    , json = JSON.stringify(obj)
+    , h    = handler({ path: '/', public_key: public_key })
+    , req  = mkReq('/')
+    , res  = mkRes()
+
+  req.headers['signature'] = key.sign(obj, 'base64', 'base64')
+  // break signage by a tiny bit
+  req.headers['signature'] = '0' + req.headers['signature'].substring(1)
+
+  h(req, res, function (err) {
+    t.ok(err, 'got an error')
+    t.equal(res.$statusCode, 400, 'correct status code')
+    t.deepEqual(res.$headers, { 'content-type': 'application/json' })
+    t.equal(res.$end, '{"error":"Signed payload does not match signature"}', 'got correct content')
+  })
+
+  h.on('success', function(req) {
+    t.fail(true, 'should not get here!')
+  })
+
+  process.nextTick(function () {
+    req.end('payload=' + json);
+  })
+})
 
 test('handler accepts valid urls', function(t) {
     var options = {
         path: '/some/url',
-        token: 'bogus'
+        public_key: public_key
     };
     var h = handler(options);
 
@@ -123,7 +163,7 @@ test('handler accepts valid urls', function(t) {
 test('handler accepts form payload', function (t) {
     var options = {
         path: '/some/url',
-        token: 'bogus'
+        public_key: public_key
     };
     var h = handler(options);
     var req = mkReq('/some/url');
@@ -131,6 +171,8 @@ test('handler accepts form payload', function (t) {
     var json = { status: 0 };
 
     t.plan(5);
+
+    req.headers['signature'] = key.sign(json, 'base64', 'base64')
 
     h.on('success', function(req) {
         t.deepEqual(req.payload, json, 'payload is correct');
@@ -153,7 +195,7 @@ test('handler accepts form payload', function (t) {
 test('handler emits start event', function (t) {
     var options = {
         path: '/some/url',
-        token: 'bogus'
+        public_key: public_key
     };
     var h = handler(options);
     var req = mkReq('/some/url');
@@ -161,6 +203,8 @@ test('handler emits start event', function (t) {
     var json = { status: 1, status_message: 'Pending' };
 
     t.plan(1);
+
+    req.headers['signature'] = key.sign(json, 'base64', 'base64')
 
     h.on('start', function() {
         t.pass('start event emitted');
@@ -179,7 +223,7 @@ test('handler emits start event', function (t) {
 test('handler emits failure event', function (t) {
     var options = {
         path: '/some/url',
-        token: 'bogus'
+        public_key: public_key
     };
     var h = handler(options);
     var req = mkReq('/some/url');
@@ -187,6 +231,8 @@ test('handler emits failure event', function (t) {
     var json = { status: 1, status_message: 'Broken' };
 
     t.plan(1);
+
+    req.headers['signature'] = key.sign(json, 'base64', 'base64')
 
     h.on('failure', function() {
         t.pass('failure event emitted');
